@@ -1,0 +1,815 @@
+---
+title: "Time-series analysis of COVID-19 infections - Albane Keraudren-Riguidel"
+output: 
+  flexdashboard::flex_dashboard:
+    theme:
+      bg: "#FDF7F7"
+      fg: "#101010" 
+      primary: "#76b4ed"
+    vertical_layout: scroll
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(plotly)
+library(dygraphs)
+library(corrplot)
+
+# Install thematic and un-comment for themed static plots (i.e., ggplot2)
+# thematic::thematic_rmd()
+
+covid19_final <- read_csv("~/covid19_final_with_italy.csv")
+
+covid19_final <- covid19_final %>% sele
+
+#put columns' attribute of each country as a variable to create a long table with "date", "variable", "value" 
+#to plot graphs with all countries together
+covid19_final_all <- melt(setDT(covid19_final), id.vars="Date")
+
+covid19_final_all_plot <- covid19_final_all %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "6 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "Cumulated cases", title = "Cumulated cases in all countries")+
+  theme(legend.position = "bottom")
+
+
+covid19_final_be <- covid19_final %>% 
+  ggplot(aes(x=Date, y=Belgium))+
+  geom_line()+
+  scale_x_date(date_breaks = "6 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "Cumulated cases", title = "Cumulated cases in Belgium")+
+  theme(legend.position = "bottom")
+
+covid19_final_fr <- covid19_final %>% 
+  ggplot(aes(x=Date, y=France))+
+  geom_line()+
+  scale_x_date(date_breaks = "6 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "Cumulated cases", title = "Cumulated cases in France")+
+  theme(legend.position = "bottom")
+
+covid19_final_de <- covid19_final %>% 
+  ggplot(aes(x=Date, y=Germany))+
+  geom_line()+
+  scale_x_date(date_breaks = "6 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "Cumulated cases", title = "Cumulated cases in Germany")+
+  theme(legend.position = "bottom")
+
+covid19_final_lu <- covid19_final %>% 
+  ggplot(aes(x=Date, y=Luxembourg))+
+  geom_line()+
+  scale_x_date(date_breaks = "6 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "Cumulated cases", title = "Cumulated cases in Luxembourg")+
+  theme(legend.position = "bottom")
+
+
+#by plotting the graphs from "covid19_final", we notice that we have cumulated values
+#so we need to find the variations per day (= new cases per day)
+#formula: day2 = day2-day1
+covid19_var_1day <- covid19_final %>% 
+  mutate(Belgium = (Belgium - lag(Belgium, 1))*100/11697557,
+         France = (France - lag(France, 1))*100/64756584,
+         Germany = (Germany - lag(Germany, 1))*100/83862225,
+         Luxembourg = (Luxembourg - lag(Luxembourg, 1))*100/654768,
+         Italy = (Italy - lag(Italy, 1))*100/58797655) %>% 
+  drop_na(Belgium, France, Germany, Luxembourg, Italy)
+
+
+#same but over every 7 days
+covid19_var_7day <- covid19_final %>% 
+  mutate(Belgium = (Belgium - lag(Belgium, 7))*100/11697557,
+         France = (France - lag(France, 7))*100/64756584,
+         Germany = (Germany - lag(Germany, 7))*100/83862225,
+         Luxembourg = (Luxembourg - lag(Luxembourg, 14))*100/654768,
+         Italy = (Italy - lag(Italy, 7))*100/58797655)%>% 
+  drop_na(Belgium, France, Germany, Luxembourg, Italy)
+
+
+#same but over every 14 days
+covid19_var_14day <- covid19_final %>% 
+  mutate(Belgium = (Belgium - lag(Belgium, 14))*100/11697557,
+         France = (France - lag(France, 14))*100/64756584,
+         Germany = (Germany - lag(Germany, 14))*100/83862225,
+         Luxembourg = (Luxembourg - lag(Luxembourg, 14))*100/654768,
+         Italy = (Italy - lag(Italy, 14))*100/58797655)%>% 
+  drop_na(Belgium, France, Germany, Luxembourg, Italy)
+
+
+#same but over every 28 days
+covid19_var_28day <- covid19_final %>% 
+  mutate(Belgium = (Belgium - lag(Belgium, 28))*100/11697557,
+         France = (France - lag(France, 28))*100/64756584,
+         Germany = (Germany - lag(Germany, 28))*100/83862225,
+         Luxembourg = (Luxembourg - lag(Luxembourg, 28))*100/654768,
+         Italy = (Italy - lag(Italy, 28))*100/58797655)%>% 
+  drop_na(Belgium, France, Germany, Luxembourg, Italy)
+
+
+
+covid19_all_1day <- melt(setDT(covid19_var_1day), id.vars="Date")
+
+covid19_all_7day <- melt(setDT(covid19_var_7day), id.vars="Date")
+
+covid19_all_14day <- melt(setDT(covid19_var_14day), id.vars="Date")
+
+covid19_all_28day <- melt(setDT(covid19_var_28day), id.vars="Date")
+
+covid19_all_1day_plot <- covid19_all_1day %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "3 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every day in all countries")+
+  theme(legend.position = "bottom")
+
+covid19_all_7day_plot <- covid19_all_7day %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "3 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 7 days in all countries")+
+  theme(legend.position = "bottom")
+
+covid19_all_14day_plot <- covid19_all_14day %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "3 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries")+
+  theme(legend.position = "bottom")
+
+covid19_all_28day_plot <- covid19_all_28day %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "3 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 28 days in all countries")+
+  theme(legend.position = "bottom")
+
+
+covid19_coef_7 <- covid19_all_7day %>%
+  group_by(variable) %>% 
+  mutate(value = (value - lag(value, 7)) / value)
+
+covid19_coef_14 <- covid19_all_14day %>%
+  group_by(variable) %>% 
+  mutate(value = (value - lag(value, 14)) / value)
+
+covid19_coef_28 <- covid19_all_14day %>%
+  group_by(variable) %>% 
+  mutate(value = (value - lag(value, 28)) / value)
+
+```
+
+# Readme
+
+### Time-series analysis of COVID-19 infections in comparison between Luxembourg and neighbouring countries
+
+This is the [R Markdown](http://rmarkdown.rstudio.com) that serves as technical deliverable for the Bachelor Semester Project 3 of the student Albane Keraudren-Riguidel.
+
+The aim of this deliverable is to do a time-series analysis on data sets containing data about COVID-19 in Luxembourg, France, Germany, Belgium and Italy.
+
+For this study, we will use the data sets from the Johns Hopkins University for their exhaustive reports about COVID-19 for different countries: [JHU CSSE COVID-19 Data](https://github.com/CSSEGISandData/COVID-19)
+
+
+-------------------------------------------------------------------------------
+
+# Overview
+
+With the CSV file "time_series_covid19_confirmed_global.csv" of the [JHU CSSE COVID-19 Data](https://github.com/CSSEGISandData/COVID-19), and after cleaning, creating an appropriate data set to work on, and processing the data, we can obtain the chart below. It depicts the new infections cases in all the studied countries through bi-weekly observations. 
+
+We can observe some positive and negative spikes. 
+The negative spikes represent missing values in the data set.
+The positive spikes will be studied in this time-series analysis by selected date frames. For each period, an explanation will be provided based on some news article or from government websites, and statistical tests (correlation testing).
+
+The charts in the Time-series menu illustrate the gradients from the new cases in each country.
+
+Luxembourg, Belgium, France, and Germany will also be compared to Italy. In fact, Italy is known for having a great number of infections of Covid-19 in some regions. For each country in the graph below, the data reflects the infections in the whole country and not by region. So the cases in Italy will be mainly provided from the news and articles, especially for the Lombardy region and Northern Italy.
+
+#### Chart representing the new cases of COVID-19 infections in all countries with bi-weekly observations
+```{r}
+ggplotly(covid19_all_14day_plot)
+
+```
+
+#### Correlation table corresponding to the chart with Pearson's product-moment correlation
+```{r}
+#correlation table for full period (Pearson's product-moment correlation)
+#does not select the column with the dates
+correlation_matrix <- cor(covid19_var_14day %>% select(-1))
+correlation_matrix
+corrplot(correlation_matrix, method = "circle")
+
+```
+
+Based on the correlation table, it is clear that all countries have the same trends during the whole epidemic. This can be explained by the fact that the countries are all part of the European Union and that they follow the EU legislation and policies. This can infer that the global decisions made by the governments impact greatly the growth and consequences of an epidemic, in this case, a pandemic. Indeed, mediocre or late handling of the surge of the virus with no lockdowns or control of the populations would have led to an exponential increase in infection cases, probably without great decrease in the incidence rate of the virus. 
+
+------------------------------------------------------------------------------
+
+# 2020/03/01-2020/05/15 {data-navmenu="Time-series analysis"} 
+
+## Column
+
+### News and Explanations
+
+During this period, we have different events happening:
+
+In the European Union, it was announced in multiple countries that there would be a lock-down. It was to attempt to control the rise of COVID-19 infections, which goes for most countries from mid-March to May. [ina](https://www.ina.fr/ina-eclaire-actu/confinement-covid-jour-mars-2020-pandemie)
+
+Luxembourg has a high percentage of new cases. This can be explained by two facts:
+- at that time, Luxembourgish inhabitants were not distinguished from the foreign workers in the COVID-19 test data sets
+- there was a large testing campaign in the country
+
+
+In Italy the Northern regions were greately impacted. This [article from The Lancet](https://www.thelancet.com/journals/lanpub/article/PIIS2468-2667%2820%2930099-2/fulltext) argues that the data about COVID-19 in Italy is not representative at the regional level. In fact, the concentration of the population is not evenly distributed in the country, having a high percentage of the global population in Italy living in the North. In this study, Italy was added even though it is not a neighbouring country of Luxembourg. It is to illustrate that the data used in here does not reflect what happens on a local level but on a national level. This means that when the percentage of new cases for one country is low, it may actually be extremely high in one of the regions of the country but does not impact the whole country. Thus, the plots need to be interpreted with a global point of view. 
+
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2020-03-05" & Date <= "2020-05-15") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2020/03/01-2020/05/15")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2020/03/01-2020/05/15
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2020-03-01" & Date <= "2020-05-15") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot1 <- covid19_coef_7 %>% 
+  filter(Date >= "2020-03-01" & Date <= "2020-05-15") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative of new cases every 7 days in all countries, period: 2020/03/01-2020/05/15")+
+  theme(legend.position = "bottom")
+ggplotly(plot1)
+
+```
+
+### Variations over every 14 days
+```{r}
+plot2 <-covid19_coef_14 %>% 
+  filter(Date >= "2020-03-01" & Date <= "2020-05-15") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2020/03/01-2020/05/15")+
+  theme(legend.position = "bottom")
+ggplotly(plot2)
+
+```
+
+### Variations over every 28 days
+```{r}
+plot3 <- covid19_coef_28 %>% 
+  filter(Date >= "2020-03-01" & Date <= "2020-05-15") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2020/03/01-2020/05/15")+
+  theme(legend.position = "bottom")
+ggplotly(plot3)
+
+```
+
+
+# 2020/06/30-2020/08/30 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+A few days before this period, there was in Luxembourg starting the 19/07/2020 restrictions on the number of persons in one same place.
+
+During this period, the Summer holidays took place in all countries with strict restrictions similar to lockdown. For instance, in Luxembourg on the 19/07/2020 was the start of the restriction on the number of persons in one same place.
+
+There was also a second massive testing campaign in Luxembourg which explains its weak relationships with the other countries in the correlation matrix.
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2020-06-30" & Date <= "2020-08-30") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2020/06/30-2020/08/30")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2020/06/30-2020/08/13
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2020-06-30" & Date <= "2020-08-13") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot4 <- covid19_coef_7 %>% 
+  filter(Date >= "2020-06-30" & Date <= "2020-08-30") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2020/06/30-2020/08/30")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot4)
+
+
+```
+
+### Variations over every 14 days
+```{r}
+
+plot5 <-covid19_coef_14 %>% 
+  filter(Date >= "2020-06-30" & Date <= "2020-08-30") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2020/06/30-2020/08/30")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot5)
+
+
+```
+
+### Variations over every 28 days
+
+```{r}
+
+plot6 <- covid19_coef_28 %>% 
+  filter(Date >= "2020-06-30" & Date <= "2020-08-30") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2020/06/30-2020/08/30")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot6)
+
+```
+
+# 2020/10/15-2020/12/10 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+In this period, when checking the correlation matrix, we can see that the relationships are divided in two:
+- Belgium and France
+- Germany, Italy, and Luxembourg
+
+In France, the reasons are not much explained as indicated in the [Report from the French Government](https://www.santepubliquefrance.fr/maladies-et-traumatismes/maladies-et-infections-respiratoires/infection-a-coronavirus/documents/bulletin-national/covid-19-point-epidemiologique-du-9-novembre-2020).
+It may be that more COVID-19 tests were done beginning of November as the holidays ended and tests had to be done before going back to school or to work.
+The decrease during November is due to the fact that a second lockdown took place during that whole month.
+
+In this [news article from RTL Belgium](https://www.rtl.be/actu/coronavirus-en-belgique-bilan-du-jour-voici-les-chiffres/2020-11-09/article/349481), it is reported that the politics for the tests has changed end of October: only people with symptoms are tested, which means that the probability of having positive results increases significantly. This may explain the high percentage of new cases in Belgium.
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2020-10-15" & Date <= "2020-12-10") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2020/10/15-2020/12/10")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2020/10/15-2020/12/10
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2020-10-15" & Date <= "2020-12-10") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot7 <- covid19_coef_7 %>% 
+  filter(Date >= "2020-10-15" & Date <= "2020-12-10") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2020/10/15-2020/12/10")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot7)
+
+
+```
+
+### Variations over every 14 days
+
+```{r}
+
+plot8 <-covid19_coef_14 %>% 
+  filter(Date >= "2020-10-15" & Date <= "2020-12-10") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2020/10/15-2020/12/10")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot8)
+
+
+```
+
+### Variations over every 28 days
+
+```{r}
+
+plot9 <- covid19_coef_28 %>% 
+  filter(Date >= "2020-10-15" & Date <= "2020-12-10") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2020/10/15-2020/12/10")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot9)
+
+
+```
+
+# 2021/03/01-2021/07/01 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+In this period, we can see that all countries acts similarly. The slight increase in March-April may be due to the Easter holidays which took place end of March - beginning of April so people traveled more and thus the populations were mixed, explaining the similar curves.
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2021-03-01" & Date <= "2021-07-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2021/03/01-2021/07/01")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2021/03/01-2021/07/01
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2021-03-01" & Date <= "2021-07-01") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot10 <- covid19_coef_7 %>% 
+  filter(Date >= "2021-03-01" & Date <= "2021-07-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2021/03/01-2021/07/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot10)
+
+
+```
+
+### Variations over every 14 days
+
+```{r}
+
+plot11 <-covid19_coef_14 %>% 
+  filter(Date >= "2021-03-01" & Date <= "2021-07-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2021/03/01-2021/07/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot11)
+
+
+```
+
+### Variations over every 28 days
+
+```{r}
+
+plot12 <- covid19_coef_28 %>% 
+  filter(Date >= "2021-03-01" & Date <= "2021-07-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2021/03/01-2021/07/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot12)
+
+
+```
+
+# 2021/07/01-2021/10/01 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+This period is where the correlation matrix is the more diverse. We can see that France and Germany have a very weak relationship and that Luxembourg acts completely different from the other countries. 
+
+In this [article from the Luxembourgish government](https://msss.gouvernement.lu/en/actualites.gouvernement+en+actualites+toutes_actualites+communiques+2021+07-juillet+14-covid19-retrospective.html), it is written that the number of tests have increased beginning of July, which explain the sudden rise in percentage during that period.It may be due to people wanting to test themselves before meeting their families during the Summer holidays.
+
+For France, this [article](https://www.santepubliquefrance.fr/maladies-et-traumatismes/maladies-et-infections-respiratoires/infection-a-coronavirus/documents/bulletin-national/covid-19-point-epidemiologique-du-19-aout-2021) states that less contact persons (family of the infected person) were declared so less contaminated people were confined. This resulted in an increase of infection in France due to ignorance.
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2021-07-01" & Date <= "2021-10-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2021/07/01-2021/10/01")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2021/07/01-2021/10/01
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2021-07-01" & Date <= "2021-10-01") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot13 <- covid19_coef_7 %>% 
+  filter(Date >= "2021-07-01" & Date <= "2021-10-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2021/07/01-2021/10/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot13)
+
+
+```
+
+### Variations over every 14 days
+
+```{r}
+plot14 <-covid19_coef_14 %>% 
+  filter(Date >= "2021-07-01" & Date <= "2021-10-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2021/07/01-2021/10/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot14)
+
+
+```
+
+### Variations over every 28 days
+```{r}
+plot15 <- covid19_coef_28 %>% 
+  filter(Date >= "2021-07-01" & Date <= "2021-10-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2021/07/01-2021/10/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot15)
+
+
+```
+
+# 2021/10/15-2022/06/01 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+In the beginning of this period, the variant Omicron appeared in Europe, especially end of November. It infects also previously infected persons and those who did not have 3 vaccinations against the virus. This explains the tremendous increase in most of the countries with higher percentages compared to other periods.
+
+Starting January 2022 we can observe that Germany has a sudden increase in new infected cases, which is late compared to the other countries. This means that they were able to control the Omicron until then. 
+
+[DW article](https://www.dw.com/en/coronavirus-digest-germany-daily-cases-hit-record-levels/a-60394417)
+
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2021-10-15" & Date <= "2022-06-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2021/10/15-2022/06/01")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2021/10/15-2022/06/01
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2021-10-15" & Date <= "2022-06-01") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot16 <- covid19_coef_7 %>% 
+  filter(Date >= "2021-10-15" & Date <= "2022-06-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2021/10/15-2022/06/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot16)
+
+
+```
+
+### Variations over every 14 days
+```{r}
+plot17 <-covid19_coef_14 %>% 
+  filter(Date >= "2021-10-15" & Date <= "2022-06-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2021/10/15-2022/06/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot17)
+
+
+```
+
+### Variations over every 28 days
+```{r}
+plot18 <- covid19_coef_28 %>% 
+  filter(Date >= "2021-10-15" & Date <= "2022-06-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2021/10/15-2022/06/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot18)
+
+
+```
+
+# 2022/06/01-2023/02/01 {data-navmenu="Time-series analysis"}
+
+## Column
+
+### News and Explanations
+
+In these last months, after large vaccination campaigns in all countries and similar politics and restrictions, all countries are acting similarly. The correlation matrix depicts in fact strong relationships with one another and the derivatives are almost all equivalent.
+The negative spike in the purple curve is due to missing values or to the fact that there was no new case on the days the variation is based of.
+
+### Graph
+```{r}
+ggplotly(covid19_all_14day %>% 
+  filter(Date >= "2022-06-01" & Date <= "2023-02-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "New cases every 14 days in all countries, period: 2022/06/01-2023/02/01")+
+  theme(legend.position = "bottom")
+)
+
+
+```
+
+### Correlation Matrix
+Correlation Matrix of the period: 2022/06/01-2023/02/01
+```{r}
+correlation_matrix_dated <- cor(covid19_var_14day %>% filter(Date >= "2022-06-01" & Date <= "2023-02-01") %>% select(-1))
+corrplot(correlation_matrix_dated, method = "circle")
+
+
+```
+
+### Variations over every 7 days
+```{r}
+plot19 <- covid19_coef_7 %>% 
+  filter(Date >= "2022-06-01" & Date <= "2023-02-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 7 days in all countries, period: 2022/06/01-2023/02/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot19)
+
+
+```
+
+### Variations over every 14 days
+```{r}
+plot20 <-covid19_coef_14 %>% 
+  filter(Date >= "2022-06-01" & Date <= "2023-02-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 14 days in all countries, period: 2022/06/01-2023/02/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot20)
+
+```
+
+### Variations over every 28 days
+```{r}
+plot21 <- covid19_coef_28 %>% 
+  filter(Date >= "2022-06-01" & Date <= "2023-02-01") %>% 
+  ggplot(aes(x=Date, y=value, color=variable))+
+  geom_line()+
+  scale_x_date(date_breaks = "1 months", minor_breaks = "2 weeks", date_labels = "%b %Y")+
+  scale_y_continuous(labels = scales::comma)+
+  labs(x = "Date, date breaks = 2 weeks", y = "New cases in %", title = "Directional derivative  of new cases every 28 days in all countries, period: 2022/06/01-2023/02/01")+
+  theme(legend.position = "bottom")
+
+ggplotly(plot21)
+
+
+```
+
